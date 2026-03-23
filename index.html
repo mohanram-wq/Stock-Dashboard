@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batter Container Stock Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0c10; --surface:#111420; --surface2:#181c2a; --border:#242840;
+    --accent:#4f8ef7; --accent2:#7c5cfc; --green:#22d3a0; --yellow:#f5c842;
+    --red:#f75e5e; --orange:#f79a4f; --text:#e8eaf0; --muted:#6b7099;
+    --font:'Syne',sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:auto}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(79,142,247,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(79,142,247,.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+  .page{max-width:1700px;margin:0 auto;padding:0 20px;position:relative;z-index:1}
+
+  /* SAVE BAR */
+  .save-bar{
+    position:sticky;top:0;z-index:100;
+    background:rgba(10,12,16,.95);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+    padding:10px 20px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    margin:0 -20px;
+  }
+  .save-bar-left{display:flex;align-items:center;gap:10px}
+  .save-status{font-family:var(--mono);font-size:.68rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .save-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+  .save-dot.saved{background:var(--green)}
+  .save-dot.unsaved{background:var(--yellow);animation:bk 1s infinite}
+  .save-dot.saving{background:var(--accent);animation:bk .5s infinite}
+  .save-btn{
+    font-family:var(--font);font-size:.72rem;font-weight:700;
+    padding:7px 18px;border-radius:8px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    border:none;color:#fff;cursor:pointer;
+    box-shadow:0 0 14px rgba(79,142,247,.35);
+    transition:all .2s;white-space:nowrap;
+  }
+  .save-btn:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(79,142,247,.5)}
+  .save-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .reset-btn2{
+    font-family:var(--font);font-size:.68rem;font-weight:600;
+    padding:6px 14px;border-radius:7px;
+    border:1px solid var(--border);background:var(--surface2);
+    color:var(--muted);cursor:pointer;transition:all .15s;
+  }
+  .reset-btn2:hover{border-color:var(--orange);color:var(--orange)}
+  .last-saved{font-family:var(--mono);font-size:.6rem;color:var(--muted)}
+
+  /* HEADER */
+  header{padding:20px 0 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .hd-left{display:flex;align-items:center;gap:14px}
+  .hd-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;box-shadow:0 0 18px rgba(79,142,247,.3);flex-shrink:0}
+  .hd-title h1{font-size:1.3rem;font-weight:800;background:linear-gradient(90deg,#fff,var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hd-title p{font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-top:2px}
+  .hd-tag{font-family:var(--mono);font-size:.65rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:5px 11px;border-radius:7px}
+
+  /* KPI */
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;padding:18px 0 0}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:15px 17px;position:relative;overflow:hidden;transition:border-color .2s}
+  .kpi:hover{border-color:var(--accent)}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:13px 13px 0 0}
+  .kpi.b::before{background:var(--accent)}.kpi.g::before{background:var(--green)}.kpi.y::before{background:var(--yellow)}.kpi.r::before{background:var(--red)}.kpi.o::before{background:var(--orange)}
+  .kpi-lbl{font-size:.6rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px}
+  .kpi-val{font-size:1.65rem;font-weight:800;margin:5px 0 2px;letter-spacing:-1px}
+  .kpi-sub{font-family:var(--mono);font-size:.6rem;color:var(--muted)}
+  .kpi.b .kpi-val{color:var(--accent)}.kpi.g .kpi-val{color:var(--green)}.kpi.y .kpi-val{color:var(--yellow)}.kpi.r .kpi-val{color:var(--red)}.kpi.o .kpi-val{color:var(--orange)}
+
+  /* CONTROLS */
+  .ctrl{display:flex;align-items:center;gap:9px;padding:16px 0 12px;flex-wrap:wrap}
+  .sec-title{font-size:.9rem;font-weight:700;flex:1;min-width:140px}
+  .sec-title span{color:var(--accent)}
+  .fbtn{font-family:var(--font);font-size:.66rem;font-weight:600;padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+  .fbtn:hover{border-color:var(--accent);color:var(--text)}
+  .fbtn.act{background:var(--accent);border-color:var(--accent);color:#fff}
+  .fbtn.g.act{background:var(--green);border-color:var(--green);color:#0a0c10}
+  .fbtn.y.act{background:var(--yellow);border-color:var(--yellow);color:#1a1a1a}
+  .fbtn.r.act{background:var(--red);border-color:var(--red);color:#fff}
+  .flbl{font-size:.62rem;color:var(--muted);font-weight:700}
+
+  /* LEGEND */
+  .legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:8px 0 0}
+  .leg{display:flex;align-items:center;gap:5px;font-size:.62rem;color:var(--muted)}
+  .ldot{width:7px;height:7px;border-radius:50%}
+
+  /* DETAIL PANEL */
+  .dpanel{background:var(--surface);border:1px solid var(--border);border-radius:15px;padding:20px;margin-bottom:16px;display:none;animation:fs .2s ease}
+  .dpanel.show{display:block}
+  @keyframes fs{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  .dp-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px}
+  .dp-name{font-size:1rem;font-weight:800}
+  .dp-meta{font-family:var(--mono);font-size:.63rem;color:var(--muted);margin-top:3px}
+  .dp-close{width:29px;height:29px;flex-shrink:0;background:var(--surface2);border:1px solid var(--border);border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;color:var(--muted);transition:all .15s}
+  .dp-close:hover{border-color:var(--red);color:var(--red)}
+  .dp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:9px;margin-bottom:16px}
+  .dp-stat{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 13px}
+  .dp-sl{font-size:.57rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+  .dp-sv{font-family:var(--mono);font-size:.9rem;font-weight:600;margin-top:4px}
+  .po-sec{display:flex;gap:9px;flex-wrap:wrap}
+  .po-card{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 14px;flex:1;min-width:190px}
+  .po-ct{font-size:.62rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.9px;margin-bottom:7px}
+  .po-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+  .po-rl{font-size:.62rem;color:var(--muted)}
+  .po-rv{font-family:var(--mono);font-size:.7rem;color:var(--text);font-weight:500}
+  .tl-title{font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:14px 0 9px}
+  .timeline{display:flex;gap:3px;align-items:flex-end;height:68px}
+  .tl-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end}
+  .tl-bar{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:height .4s}
+  .tl-lb{font-family:var(--mono);font-size:.48rem;color:var(--muted);white-space:nowrap}
+
+  /* TABLE */
+  .tbl-outer{background:var(--surface);border:1px solid var(--border);border-radius:15px;overflow:hidden;margin-bottom:18px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;min-width:1600px}
+  .cgr th{font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:1.1px;padding:6px 9px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap}
+  .cg0{background:#131726;color:var(--muted)}
+  .cg1{background:#0f1a24;color:var(--accent);border-left:1px solid var(--border)}
+  .cg2{background:#141624;color:#7c9ef7;border-left:1px solid var(--border)}
+  .cg3{background:#12141e;color:#9b7aff;border-left:1px solid var(--border)}
+  .cg4{background:#1a1418;color:var(--red);border-left:1px solid var(--border)}
+  .cg5{background:#141a14;color:var(--green);border-left:1px solid var(--border)}
+  .cg6{background:#191719;color:var(--orange);border-left:1px solid var(--border)}
+  thead .hr th{font-size:.58rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:8px 9px;text-align:left;background:var(--surface2);border-bottom:1px solid var(--border);white-space:nowrap}
+  th.sort{cursor:pointer}
+  th.sort:hover{color:var(--accent)}
+  th.bl,td.bl{border-left:1px solid var(--border)}
+  tbody tr{border-bottom:1px solid rgba(36,40,64,.55);transition:background .15s;cursor:pointer}
+  tbody tr:last-child{border-bottom:none}
+  tbody tr:hover{background:rgba(79,142,247,.04)}
+  tbody tr.sel{background:rgba(79,142,247,.09);outline:1px solid rgba(79,142,247,.3)}
+  td{padding:9px 9px;font-size:.75rem;vertical-align:middle}
+  .pname{font-weight:700;font-size:.76rem}
+  .psku{font-family:var(--mono);font-size:.57rem;color:var(--muted);margin-top:1px}
+  .mono{font-family:var(--mono)}
+  .ei{font-family:var(--mono);font-size:.73rem;font-weight:600;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);transition:border-color .15s;width:100%;min-width:60px}
+  .ei:focus{outline:none;border-color:var(--accent)}
+  .ei.ed{border-color:var(--yellow);color:var(--yellow)}
+  .ei.num{text-align:right}
+  .ei.dt{text-align:center;min-width:96px}
+  .ei.po-inp{min-width:56px}
+  .pill{display:inline-block;font-size:.56rem;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
+  .p-ok{background:rgba(34,211,160,.13);color:var(--green);border:1px solid rgba(34,211,160,.28)}
+  .p-warn{background:rgba(245,200,66,.13);color:var(--yellow);border:1px solid rgba(245,200,66,.28)}
+  .p-bad{background:rgba(247,94,94,.13);color:var(--red);border:1px solid rgba(247,94,94,.28)}
+  .p-crit{background:rgba(247,94,94,.22);color:var(--red);border:1px solid var(--red);animation:bk 1.4s infinite}
+  @keyframes bk{0%,100%{opacity:1}50%{opacity:.5}}
+  .bw{min-width:75px}
+  .bb{height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:3px}
+  .bf{height:100%;border-radius:3px;transition:width .4s}
+  .date-val{font-family:var(--mono);font-size:.68rem;color:var(--muted);white-space:nowrap}
+  tfoot td{font-family:var(--mono);font-size:.65rem;font-weight:700;padding:9px 9px;background:var(--surface2);border-top:1px solid var(--border);color:var(--accent)}
+  footer{padding:14px 0;text-align:center;font-family:var(--mono);font-size:.58rem;color:var(--muted);border-top:1px solid var(--border);margin-top:4px}
+
+  /* TOAST */
+  .toast{
+    position:fixed;bottom:24px;right:24px;z-index:999;
+    font-family:var(--mono);font-size:.72rem;font-weight:600;
+    padding:10px 18px;border-radius:10px;
+    background:var(--surface);border:1px solid var(--border);
+    color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.4);
+    opacity:0;transform:translateY(8px);
+    transition:all .25s ease;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateY(0)}
+  .toast.ok{border-color:var(--green);color:var(--green)}
+  .toast.err{border-color:var(--red);color:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- STICKY SAVE BAR -->
+<div class="save-bar">
+  <div class="save-bar-left">
+    <div class="save-status">
+      <div class="save-dot saved" id="saveDot"></div>
+      <span id="saveStatus">All changes saved</span>
+    </div>
+    <div class="last-saved" id="lastSaved"></div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="reset-btn2" id="resetBtn">↺ Reset to Original</button>
+    <button class="save-btn" id="saveBtn">💾 Save Changes</button>
+  </div>
+</div>
+
+<div class="page">
+
+<header>
+  <div class="hd-left">
+    <div class="hd-icon">📦</div>
+    <div class="hd-title">
+      <h1>Batter Container Stock Dashboard</h1>
+      <p>CONTAINER RUNRATE · LIVE FORECAST — EDIT ANY CELL · SAVE TO SHARE WITH TEAM</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <div class="hd-tag" id="hdrDate"></div>
+    <div class="hd-tag">STOCK DATE: 06 MAR 2026</div>
+  </div>
+</header>
+
+<div class="kpi-row">
+  <div class="kpi b"><div class="kpi-lbl">Total SKUs</div><div class="kpi-val" id="kT">—</div><div class="kpi-sub">active products</div></div>
+  <div class="kpi g"><div class="kpi-lbl">Stock OK</div><div class="kpi-val" id="kG">—</div><div class="kpi-sub">32oz ≥60d · 64oz ≥45d</div></div>
+  <div class="kpi y"><div class="kpi-lbl">Warning</div><div class="kpi-val" id="kW">—</div><div class="kpi-sub">32oz 40–59d · 64oz 30–44d</div></div>
+  <div class="kpi r"><div class="kpi-lbl">Critical</div><div class="kpi-val" id="kC">—</div><div class="kpi-sub">32oz &lt;40d · 64oz &lt;30d</div></div>
+  <div class="kpi b"><div class="kpi-lbl">Total Stock</div><div class="kpi-val" id="kS">—</div><div class="kpi-sub">all SKUs</div></div>
+  <div class="kpi o"><div class="kpi-lbl">Open PO Value</div><div class="kpi-val" id="kP">—</div><div class="kpi-sub">purchase orders</div></div>
+</div>
+
+<div class="legend">
+  <div class="leg"><div class="ldot" style="background:var(--green)"></div>OK — 32oz ≥60d · 64oz ≥45d</div>
+  <div class="leg"><div class="ldot" style="background:var(--yellow)"></div>Warning — 32oz 40–59d · 64oz 30–44d</div>
+  <div class="leg"><div class="ldot" style="background:var(--red)"></div>Critical — 32oz &lt;40d · 64oz &lt;30d</div>
+  <div class="leg"><div class="ldot" style="background:var(--red);animation:bk 1.4s infinite"></div>Out of Stock</div>
+  <div class="leg" style="margin-left:auto;font-size:.6rem;color:var(--muted)">📌 Status = Physical Stock + Open PO #1 + Open PO #2 · Click row for details</div>
+</div>
+
+<div class="ctrl">
+  <div class="sec-title">Container <span>Runrate</span> & Forecast</div>
+  <span class="flbl">FILTER:</span>
+  <button class="fbtn act" data-f="all">All</button>
+  <button class="fbtn g"   data-f="ok">✓ OK</button>
+  <button class="fbtn y"   data-f="warn">⚠ Warning</button>
+  <button class="fbtn r"   data-f="crit">🔴 Critical</button>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="dpanel" id="dp">
+  <div class="dp-head">
+    <div><div class="dp-name" id="dpN"></div><div class="dp-meta" id="dpM"></div></div>
+    <div class="dp-close" id="dpX">✕</div>
+  </div>
+  <div class="dp-grid" id="dpG"></div>
+  <div class="po-sec" id="dpPO"></div>
+  <div class="tl-title">WEEKLY STOCK DEPLETION FORECAST</div>
+  <div class="timeline" id="dpTL"></div>
+</div>
+
+<!-- TABLE -->
+<div class="tbl-outer">
+<table id="mt">
+  <thead>
+    <tr class="cgr">
+      <th class="cg0" colspan="4">PRODUCT INFO</th>
+      <th class="cg1 bl" colspan="6">CURRENT STATUS</th>
+      <th class="cg2 bl" colspan="5">OPEN PURCHASE ORDER #1</th>
+      <th class="cg3 bl" colspan="4">OPEN PURCHASE ORDER #2</th>
+      <th class="cg4 bl" colspan="3">TOTAL STOCK + ORDERS</th>
+      <th class="cg5 bl" colspan="1">REORDER</th>
+      <th class="cg6 bl" colspan="3">PRODUCTION SCHEDULE</th>
+    </tr>
+    <tr class="hr">
+      <th>Product Name</th>
+      <th>Vendor</th>
+      <th>Part #</th>
+      <th>Lead Time</th>
+      <th class="bl sort" data-c="stock">Physical Stock</th>
+      <th class="sort" data-c="week">Weekly Rate</th>
+      <th>Monthly Rate</th>
+      <th class="sort" data-c="days">Days Left</th>
+      <th>Stock Till Date</th>
+      <th>Status</th>
+      <th class="bl">Open PO #1 No.</th>
+      <th>Open Qty</th>
+      <th>Order Cost ($)</th>
+      <th>Floor Stock Ready</th>
+      <th>ETA @ Warehouse</th>
+      <th class="bl">Open PO #2 No.</th>
+      <th>Open Qty</th>
+      <th>Floor Stock Ready</th>
+      <th>ETA @ Warehouse</th>
+      <th class="bl">Total Stock+Orders</th>
+      <th class="sort" data-c="tdays">Total Days</th>
+      <th>Available Till</th>
+      <th class="bl">Reorder Period</th>
+      <th class="bl">PO #</th>
+      <th>Ordered Qty</th>
+      <th>Shipment Available Date</th>
+    </tr>
+  </thead>
+  <tbody id="tb"></tbody>
+  <tfoot>
+    <tr>
+      <td colspan="4">TOTALS</td>
+      <td class="bl" id="ftS">—</td><td id="ftW">—</td><td id="ftM">—</td>
+      <td colspan="3"></td>
+      <td class="bl"></td><td id="ftOQ">—</td><td id="ftOC">—</td><td colspan="2"></td>
+      <td class="bl"></td><td id="ftOQ2">—</td><td colspan="2"></td>
+      <td class="bl" id="ftT">—</td><td colspan="4"></td>
+    </tr>
+  </tfoot>
+</table>
+</div>
+
+<footer>BATTER CONTAINER RUNRATE DASHBOARD · STOCK DATE: 06 MAR 2026 · All fields editable · Save changes to share with team</footer>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STORAGE KEY ──────────────────────────────────────────────────────────
+const STORE_KEY = 'batter-dashboard-v1';
+
+// ── MASTER DATA ──────────────────────────────────────────────────────────
+const RAW = [
+  { name:"IDLY - 32 oz",            vendor:"IPL",           size:"32oz", partNo:"2112600171011", lead:"12 WEEKS",
+    prevStock:11335, stock:20160, monthRate:11250, weekRate:2500, stockTillDate:"05/01/2026",
+    po1:"4540", po1Qty:20160, po1Cost:4769.86, po1FloorDate:"04/03/2026", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"06/26/2026",
+    reorderPeriod:"04/02/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"DOSA - 32 oz",            vendor:"IPL",           size:"32oz", partNo:"2112600171010", lead:"12 WEEKS",
+    prevStock:39415, stock:28560, monthRate:15835, weekRate:3519, stockTillDate:"05/02/2026",
+    po1:"4540", po1Qty:20160, po1Cost:4769.86, po1FloorDate:"04/03/2026", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"06/10/2026",
+    reorderPeriod:"04/01/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"ADAI - 32 oz",            vendor:"IPL",           size:"32oz", partNo:"2112600171021", lead:"8 WEEKS",
+    prevStock:14500, stock:15960, monthRate:1080, weekRate:240, stockTillDate:"06/15/2027",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"06/14/2027",
+    reorderPeriod:"03/16/2027", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"UTTAPAM - 32 oz",         vendor:"IPL",           size:"32oz", partNo:"2112600171018", lead:"8 WEEKS",
+    prevStock:6000, stock:5880, monthRate:1125, weekRate:250, stockTillDate:"08/18/2026",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"08/17/2026",
+    reorderPeriod:"05/19/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"RAGI - 32 oz",            vendor:"IPL",           size:"32oz", partNo:"2112600171022", lead:"8 WEEKS",
+    prevStock:13058, stock:14280, monthRate:1080, weekRate:240, stockTillDate:"04/27/2027",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"04/26/2027",
+    reorderPeriod:"01/26/2027", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"GREEN MOONG DOSA 32oz",   vendor:"IPL",           size:"32oz", partNo:"2112600171019", lead:"8 WEEKS",
+    prevStock:9865, stock:8820, monthRate:1305, weekRate:290, stockTillDate:"10/05/2026",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"10/04/2026",
+    reorderPeriod:"07/21/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"BROWN RICE IDLY 32oz",    vendor:"IPL",           size:"32oz", partNo:"2112600171017", lead:"8 WEEKS",
+    prevStock:7140, stock:6720, monthRate:450, weekRate:100, stockTillDate:"06/19/2027",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"06/19/2027",
+    reorderPeriod:"03/21/2027", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"BROWN RICE DOSA 32oz",    vendor:"IPL",           size:"32oz", partNo:"2112600171024", lead:"8 WEEKS",
+    prevStock:4000, stock:4200, monthRate:540, weekRate:120, stockTillDate:"11/06/2026",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"11/06/2026",
+    reorderPeriod:"08/08/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"MULTI MILLET DOSA",       vendor:"IPL",           size:"32oz", partNo:"2112600171020", lead:"8 WEEKS",
+    prevStock:2600, stock:8000, monthRate:999, weekRate:222, stockTillDate:"11/13/2026",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"11/13/2026",
+    reorderPeriod:"08/15/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"OATS DOSA",               vendor:"IPL",           size:"32oz", partNo:"2112600171023", lead:"8 WEEKS",
+    prevStock:6000, stock:7980, monthRate:720, weekRate:160, stockTillDate:"02/18/2027",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"02/18/2027",
+    reorderPeriod:"11/20/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"ORGANIC IDLY 32oz",       vendor:"IPL",           size:"32oz", partNo:"2112600171014", lead:"8 WEEKS",
+    prevStock:13500, stock:14280, monthRate:1170, weekRate:260, stockTillDate:"03/25/2027",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"03/25/2027",
+    reorderPeriod:"01/19/2027", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"ORGANIC DOSA 32oz",       vendor:"IPL",           size:"32oz", partNo:"2112600171013", lead:"8 WEEKS",
+    prevStock:6000, stock:7980, monthRate:1350, weekRate:300, stockTillDate:"09/08/2026",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"09/08/2026",
+    reorderPeriod:"07/05/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"ORGANIC BROWN DOSA 32oz", vendor:"IPL",           size:"32oz", partNo:"2111600171012", lead:"8 WEEKS",
+    prevStock:8000, stock:7140, monthRate:450, weekRate:100, stockTillDate:"07/19/2027",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"07/18/2027",
+    reorderPeriod:"05/14/2027", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"32oz PLAIN CONTAINER",    vendor:"BERRY",         size:"32oz", partNo:"1182239-21126", lead:"6 WEEKS",
+    prevStock:8000, stock:7500, monthRate:1710, weekRate:380, stockTillDate:"07/22/2026",
+    po1:"", po1Qty:0, po1Cost:0, po1FloorDate:"", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"07/22/2026",
+    reorderPeriod:"06/10/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"LIDS - PREPRINTED SMALL", vendor:"IPL",           size:"32oz", partNo:"2012700101-1", lead:"12 WEEKS",
+    prevStock:98000, stock:89000, monthRate:35100, weekRate:7800, stockTillDate:"05/25/2026",
+    po1:"4574", po1Qty:48000, po1Cost:4337.76, po1FloorDate:"04/20/2026", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"07/06/2026",
+    reorderPeriod:"04/10/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"LIDS - REGULAR BIG",      vendor:"BERRY",         size:"64oz", partNo:"1886820", lead:"4 WEEKS",
+    prevStock:40800, stock:40800, monthRate:17600, weekRate:4400, stockTillDate:"04/01/2026",
+    po1:"4532", po1Qty:43200, po1Cost:9504, po1FloorDate:"01/27/2026", po1EtaWH:"",
+    po2:"4575", po2Qty:54000, po2FloorDate:"—", po2EtaWH:"",
+    totalAvailTill:"06/01/2026",
+    reorderPeriod:"04/12/2026", prodPO:"", prodQty:0, prodShipDate:"" },
+  { name:"IDLY - 64 oz",            vendor:"BERRY",         size:"64oz", partNo:"2095994", lead:"4 WEEKS",
+    prevStock:31000, stock:23600, monthRate:17100, weekRate:3800, stockTillDate:"04/18/2026",
+    po1:"4524", po1Qty:10800, po1Cost:6372, po1FloorDate:"02/23/2026", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"05/08/2026",
+    reorderPeriod:"03/24/2026", prodPO:"4524", prodQty:32400, prodShipDate:"02/23/2026" },
+  { name:"DOSAI - 64 oz (Costco)",  vendor:"BERRY",         size:"64oz", partNo:"1876255", lead:"4 WEEKS",
+    prevStock:37000, stock:30400, monthRate:24300, weekRate:5400, stockTillDate:"04/14/2026",
+    po1:"4524", po1Qty:21600, po1Cost:12744, po1FloorDate:"02/23/2026", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"05/12/2026",
+    reorderPeriod:"03/25/2026", prodPO:"4524", prodQty:32400, prodShipDate:"02/23/2026" },
+  { name:"DOSA 64oz (NEW CONTAINER)",vendor:"BERRY (NEW)",  size:"64oz", partNo:"2072434", lead:"4 WEEKS",
+    prevStock:32000, stock:27600, monthRate:18000, weekRate:4000, stockTillDate:"04/23/2026",
+    po1:"4524", po1Qty:10800, po1Cost:6372, po1FloorDate:"02/23/2026", po1EtaWH:"",
+    po2:"", po2Qty:0, po2FloorDate:"", po2EtaWH:"",
+    totalAvailTill:"05/12/2026",
+    reorderPeriod:"03/25/2026", prodPO:"4524", prodQty:32400, prodShipDate:"02/23/2026" },
+];
+
+// ── PERSISTENCE ──────────────────────────────────────────────────────────
+function saveToStorage(data) {
+  try {
+    const payload = {
+      data: data,
+      savedAt: new Date().toISOString(),
+      savedBy: 'team'
+    };
+    localStorage.setItem(STORE_KEY, JSON.stringify(payload));
+    return true;
+  } catch(e) {
+    console.error('Save failed:', e);
+    return false;
+  }
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch(e) {
+    return null;
+  }
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let live = RAW.map(r => ({...r, curStock: r.stock}));
+let sortCol=null, sortDir=1, filterMode='all', selIdx=null;
+let hasUnsaved = false;
+let lastSavedTime = null;
+
+// ── HELPERS ───────────────────────────────────────────────────────────────
+function daysLeft(s,wr){ if(!wr||wr<=0) return s>0?9999:0; return Math.round((s/wr)*7); }
+function totalDays(tot,wr){ if(!wr) return 0; return Math.round((tot/wr)*7); }
+function getThresholds(size){ if(size==='64oz') return {warn:45,crit:30}; return {warn:60,crit:40}; }
+function statusOf(d,size){
+  if(d===9999) return {lbl:'Static',      cls:'p-ok',  grp:'ok'};
+  if(d===0)    return {lbl:'OUT OF STOCK',cls:'p-crit',grp:'crit'};
+  const t=getThresholds(size||'32oz');
+  if(d<t.crit) return {lbl:'Critical',   cls:'p-bad', grp:'crit'};
+  if(d<t.warn) return {lbl:'Warning',    cls:'p-warn',grp:'warn'};
+  return              {lbl:'OK',          cls:'p-ok',  grp:'ok'};
+}
+function effectiveDays(r){ return totalDays((r.curStock||0)+(r.po1Qty||0)+(r.po2Qty||0),r.weekRate); }
+function bc(d,size){ const t=getThresholds(size||'32oz'); if(!d||d===0) return '#f75e5e'; if(d<t.crit) return '#f75e5e'; if(d<t.warn) return '#f5c842'; return '#22d3a0'; }
+function pct(s,wr){ if(!wr) return 0; return Math.min(100,Math.max(0,100-(s/(wr*52))*100)); }
+function fn(v,dec=0){ if(v===null||v===undefined||isNaN(v)||v==='') return '—'; if(v===9999) return '∞'; return Number(v).toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec}); }
+function reCalc(i){ const r=live[i]; r.totalStockOrders=r.curStock+(r.po1Qty||0)+(r.po2Qty||0); }
+
+// ── SAVE / LOAD UI ────────────────────────────────────────────────────────
+function markUnsaved(){
+  hasUnsaved = true;
+  document.getElementById('saveDot').className='save-dot unsaved';
+  document.getElementById('saveStatus').textContent='Unsaved changes';
+  document.getElementById('saveBtn').disabled=false;
+}
+function markSaved(){
+  hasUnsaved = false;
+  lastSavedTime = new Date();
+  document.getElementById('saveDot').className='save-dot saved';
+  document.getElementById('saveStatus').textContent='All changes saved';
+  document.getElementById('saveBtn').disabled=true;
+  document.getElementById('lastSaved').textContent=
+    'Last saved: '+lastSavedTime.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+}
+function showToast(msg, type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast '+type+' show';
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+document.getElementById('saveBtn').addEventListener('click',()=>{
+  document.getElementById('saveDot').className='save-dot saving';
+  document.getElementById('saveStatus').textContent='Saving...';
+  setTimeout(()=>{
+    const ok = saveToStorage(live);
+    if(ok){
+      markSaved();
+      showToast('✓ Changes saved successfully','ok');
+    } else {
+      document.getElementById('saveDot').className='save-dot unsaved';
+      document.getElementById('saveStatus').textContent='Save failed — try again';
+      showToast('✗ Save failed','err');
+    }
+  },400);
+});
+
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  if(hasUnsaved && !confirm('Reset all data to original values? Unsaved changes will be lost.')) return;
+  live = RAW.map(r=>({...r,curStock:r.stock}));
+  saveToStorage(live);
+  selIdx=null;
+  document.getElementById('dp').classList.remove('show');
+  markSaved();
+  render();
+  showToast('↺ Reset to original data','ok');
+});
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+function render(){ updateKPIs(); renderTable(); if(selIdx!==null) renderDetail(selIdx); }
+
+function updateKPIs(){
+  let ok=0,warn=0,crit=0,totS=0;
+  live.forEach(r=>{ const d=effectiveDays(r),g=statusOf(d,r.size).grp;
+    if(g==='ok')ok++;else if(g==='warn')warn++;else crit++;
+    totS+=r.curStock; });
+  document.getElementById('kT').textContent=live.length;
+  document.getElementById('kG').textContent=ok;
+  document.getElementById('kW').textContent=warn;
+  document.getElementById('kC').textContent=crit;
+  document.getElementById('kS').textContent=(totS/1000).toFixed(0)+'K';
+  document.getElementById('kP').textContent='$'+(live.reduce((s,r)=>s+(r.po1Cost||0),0)/1000).toFixed(1)+'K';
+}
+
+function inp(val,type,field,idx,extraCls=''){
+  const isNum=type==='num';
+  const orig = RAW[idx][field];
+  const edited = isNum ? (live[idx][field]!==orig) : false;
+  return `<input class="ei ${isNum?'num':type==='dt'?'dt':''} ${edited?'ed':''} ${extraCls}"
+    type="${isNum?'number':'text'}" value="${val===0&&field!=='curStock'?'':val}"
+    data-i="${idx}" data-f="${field}" onclick="event.stopPropagation()" ${isNum?'min="0"':''} />`;
+}
+
+function renderTable(){
+  let rows=live.map((r,i)=>({...r,_i:i}));
+  if(filterMode!=='all') rows=rows.filter(r=>statusOf(effectiveDays(r),r.size).grp===filterMode);
+  if(sortCol){
+    rows.sort((a,b)=>{
+      let va,vb;
+      if(sortCol==='stock'){va=a.curStock;vb=b.curStock}
+      if(sortCol==='week'){va=a.weekRate;vb=b.weekRate}
+      if(sortCol==='days'){va=daysLeft(a.curStock,a.weekRate);vb=daysLeft(b.curStock,b.weekRate)}
+      if(sortCol==='tdays'){va=a.totalStockOrders||0;vb=b.totalStockOrders||0}
+      return(va-vb)*sortDir;
+    });
+  }
+  document.getElementById('ftS').textContent=fn(live.reduce((s,r)=>s+r.curStock,0));
+  document.getElementById('ftW').textContent=fn(live.reduce((s,r)=>s+r.weekRate,0));
+  document.getElementById('ftM').textContent=fn(live.reduce((s,r)=>s+r.monthRate,0));
+  document.getElementById('ftOQ').textContent=fn(live.reduce((s,r)=>s+(r.po1Qty||0),0));
+  document.getElementById('ftOC').textContent='$'+fn(live.reduce((s,r)=>s+(r.po1Cost||0),0),2);
+  document.getElementById('ftOQ2').textContent=fn(live.reduce((s,r)=>s+(r.po2Qty||0),0));
+  document.getElementById('ftT').textContent=fn(live.reduce((s,r)=>s+(r.curStock+(r.po1Qty||0)+(r.po2Qty||0)),0));
+
+  const tb=document.getElementById('tb');
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="26" style="text-align:center;padding:34px;font-family:var(--mono);font-size:.76rem;color:var(--muted)">No products match this filter.</td></tr>`;return;}
+
+  tb.innerHTML=rows.map(r=>{
+    const days   = daysLeft(r.curStock,r.weekRate);
+    const effD   = effectiveDays(r);
+    const st     = statusOf(effD,r.size);
+    const bclr   = bc(days,r.size);
+    const dp2    = pct(r.curStock,r.weekRate);
+    const totQty = (r.curStock||0)+(r.po1Qty||0)+(r.po2Qty||0);
+    const totD   = totalDays(totQty,r.weekRate);
+    const isSel  = selIdx===r._i;
+
+    return `<tr data-i="${r._i}" class="${isSel?'sel':''}">
+      <td><div class="pname">${r.name}<div class="psku">${r.size} · ${r.vendor}</div></div></td>
+      <td>${inp(r.vendor,'txt','vendor',r._i)}</td>
+      <td><span class="mono" style="font-size:.6rem;color:var(--muted)">${r.partNo}</span></td>
+      <td>${inp(r.lead,'txt','lead',r._i,'po-inp')}</td>
+      <td class="bl">${inp(r.curStock,'num','curStock',r._i)}</td>
+      <td>${inp(r.weekRate,'num','weekRate',r._i)}</td>
+      <td>${inp(r.monthRate,'num','monthRate',r._i)}</td>
+      <td style="color:${bclr};font-weight:700" class="mono">${days===9999?'∞':fn(days)}</td>
+      <td>${inp(r.stockTillDate,'dt','stockTillDate',r._i)}</td>
+      <td><span class="pill ${st.cls}">${st.lbl}</span></td>
+      <td class="bl">${inp(r.po1,'txt','po1',r._i,'po-inp')}</td>
+      <td>${inp(r.po1Qty,'num','po1Qty',r._i)}</td>
+      <td>${inp(r.po1Cost,'num','po1Cost',r._i)}</td>
+      <td>${inp(r.po1FloorDate,'dt','po1FloorDate',r._i)}</td>
+      <td>${inp(r.po1EtaWH,'dt','po1EtaWH',r._i)}</td>
+      <td class="bl">${inp(r.po2,'txt','po2',r._i,'po-inp')}</td>
+      <td>${inp(r.po2Qty,'num','po2Qty',r._i)}</td>
+      <td>${inp(r.po2FloorDate,'dt','po2FloorDate',r._i)}</td>
+      <td>${inp(r.po2EtaWH,'dt','po2EtaWH',r._i)}</td>
+      <td class="bl">
+        <div class="bw">
+          <span class="mono" style="font-size:.7rem">${fn(totQty)}</span>
+          <div class="bb"><div class="bf" style="width:${dp2}%;background:${bclr}"></div></div>
+        </div>
+      </td>
+      <td class="mono" style="color:${bc(totD,r.size)}">${totD===9999?'∞':fn(totD)}</td>
+      <td>${inp(r.totalAvailTill||'','dt','totalAvailTill',r._i)}</td>
+      <td class="bl" style="color:var(--green)">${inp(r.reorderPeriod,'dt','reorderPeriod',r._i)}</td>
+      <td class="bl"><span class="mono" style="color:var(--orange);font-weight:700">${r.prodPO||'—'}</span></td>
+      <td><span class="mono" style="color:var(--accent)">${r.prodQty>0?fn(r.prodQty):'—'}</span></td>
+      <td class="date-val">${r.prodShipDate||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  tb.querySelectorAll('input.ei').forEach(inp2=>{
+    inp2.addEventListener('change',e=>{
+      e.stopPropagation();
+      const i=+e.target.dataset.i,f=e.target.dataset.f;
+      const isNum=['curStock','weekRate','monthRate','po1Qty','po1Cost','po2Qty','prodQty'].includes(f);
+      live[i][f]=isNum?(parseFloat(e.target.value)||0):e.target.value;
+      reCalc(i);
+      markUnsaved();
+      render();
+    });
+    inp2.addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur();});
+    inp2.addEventListener('focus',e=>e.target.select());
+  });
+
+  tb.querySelectorAll('tr[data-i]').forEach(tr=>{
+    tr.addEventListener('click',e=>{
+      if(e.target.tagName==='INPUT') return;
+      const i=+tr.dataset.i;
+      if(selIdx===i){selIdx=null;document.getElementById('dp').classList.remove('show');}
+      else{selIdx=i;renderDetail(i);}
+      renderTable();
+    });
+  });
+}
+
+function renderDetail(i){
+  const r=live[i];
+  const days=daysLeft(r.curStock,r.weekRate);
+  const effD=effectiveDays(r);
+  const st=statusOf(effD,r.size);
+  const tot=(r.curStock||0)+(r.po1Qty||0)+(r.po2Qty||0);
+  const totD=totalDays(tot,r.weekRate);
+  document.getElementById('dpN').textContent=r.name;
+  document.getElementById('dpM').textContent=`${r.vendor} · ${r.size} · Part# ${r.partNo} · Lead: ${r.lead}`;
+  document.getElementById('dpG').innerHTML=[
+    ['Physical Stock',     fn(r.curStock),             'var(--accent)'],
+    ['Previous Month',     fn(r.prevStock),            ''],
+    ['Weekly Runrate',     fn(r.weekRate),             ''],
+    ['Monthly Runrate',    fn(r.monthRate),            ''],
+    ['Physical Days Left', days===9999?'∞':fn(days),  bc(days,r.size)],
+    ['Open PO Qty Total',  fn((r.po1Qty||0)+(r.po2Qty||0)),'var(--accent2)'],
+    ['Total Qty (w/ POs)', fn(tot),                   'var(--accent2)'],
+    ['Total Days (w/ POs)',totD===9999?'∞':fn(totD),  bc(totD,r.size)],
+    ['Stock Till Date',    r.stockTillDate||'—',       ''],
+    ['Status (total qty)', `<span class="pill ${st.cls}">${st.lbl}</span>`,''],
+    ['Reorder Period',     r.reorderPeriod||'—',       'var(--green)'],
+    ['Lead Time',          r.lead,                     'var(--orange)'],
+  ].map(([l,v,c])=>`<div class="dp-stat"><div class="dp-sl">${l}</div><div class="dp-sv" style="color:${c||'var(--text)'}">${v}</div></div>`).join('');
+  const cards=[];
+  if(r.po1||r.po1Qty>0) cards.push({t:'Open Purchase Order #1',n:r.po1,qty:r.po1Qty,cost:r.po1Cost,fl:r.po1FloorDate,eta:r.po1EtaWH});
+  if(r.po2||r.po2Qty>0) cards.push({t:'Open Purchase Order #2',n:r.po2,qty:r.po2Qty,cost:0,fl:r.po2FloorDate,eta:r.po2EtaWH});
+  document.getElementById('dpPO').innerHTML=cards.length?cards.map(p=>`
+    <div class="po-card">
+      <div class="po-ct">${p.t}${p.n?` — <span style="color:var(--orange)">#${p.n}</span>`:''}</div>
+      <div class="po-row"><span class="po-rl">Open Orders Qty</span><span class="po-rv" style="color:var(--accent)">${fn(p.qty)}</span></div>
+      ${p.cost?`<div class="po-row"><span class="po-rl">Order Cost</span><span class="po-rv" style="color:var(--green)">$${fn(p.cost,2)}</span></div>`:''}
+      <div class="po-row"><span class="po-rl">Floor Stock Ready</span><span class="po-rv">${p.fl||'—'}</span></div>
+      <div class="po-row"><span class="po-rl">ETA @ Warehouse</span><span class="po-rv">${p.eta||'—'}</span></div>
+    </div>`).join(''):`<div style="font-family:var(--mono);font-size:.68rem;color:var(--muted);padding:10px">No open purchase orders.</div>`;
+  if(r.prodPO||r.prodQty>0){
+    document.getElementById('dpPO').innerHTML+=`
+    <div class="po-card" style="border-color:rgba(247,154,79,.4)">
+      <div class="po-ct" style="color:var(--orange)">📋 Production Schedule</div>
+      <div class="po-row"><span class="po-rl">PO #</span><span class="po-rv" style="color:var(--orange);font-weight:700">${r.prodPO||'—'}</span></div>
+      <div class="po-row"><span class="po-rl">Ordered Qty</span><span class="po-rv" style="color:var(--accent)">${fn(r.prodQty)}</span></div>
+      <div class="po-row"><span class="po-rl">Shipment Available Date</span><span class="po-rv">${r.prodShipDate||'—'}</span></div>
+    </div>`;
+  }
+  const wks=Math.min(r.weekRate?Math.ceil(r.curStock/r.weekRate)+3:8,20);
+  document.getElementById('dpTL').innerHTML=Array.from({length:wks+1},(_,w)=>{
+    const rem=Math.max(0,r.curStock-r.weekRate*w);
+    const p2=r.curStock>0?(rem/r.curStock)*100:0;
+    return `<div class="tl-col"><div class="tl-bar" style="height:${p2}%;background:${bc(daysLeft(rem,r.weekRate),r.size)}"></div><div class="tl-lb">W${w}</div></div>`;
+  }).join('');
+  document.getElementById('dp').classList.add('show');
+  document.getElementById('dp').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ── EVENT BINDINGS ────────────────────────────────────────────────────────
+document.querySelectorAll('th.sort').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const c=th.dataset.c;
+    if(sortCol===c)sortDir=-sortDir;else{sortCol=c;sortDir=1;}
+    renderTable();
+  });
+});
+document.querySelectorAll('.fbtn[data-f]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    filterMode=btn.dataset.f;
+    document.querySelectorAll('.fbtn[data-f]').forEach(b=>b.classList.remove('act'));
+    btn.classList.add('act');
+    renderTable();
+  });
+});
+document.getElementById('dpX').addEventListener('click',()=>{
+  selIdx=null;
+  document.getElementById('dp').classList.remove('show');
+  renderTable();
+});
+
+// ── INIT: load saved data or defaults ────────────────────────────────────
+document.getElementById('hdrDate').textContent=new Date().toLocaleDateString('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+
+const saved = loadFromStorage();
+if(saved && saved.data){
+  // Merge saved values onto RAW structure (preserves any new fields added later)
+  live = RAW.map((r,i)=>{
+    const s = saved.data[i] || {};
+    return {...r, ...s};
+  });
+  lastSavedTime = saved.savedAt ? new Date(saved.savedAt) : null;
+  document.getElementById('saveDot').className='save-dot saved';
+  document.getElementById('saveStatus').textContent='Loaded saved data';
+  if(lastSavedTime){
+    document.getElementById('lastSaved').textContent=
+      'Last saved: '+lastSavedTime.toLocaleDateString('en-US',{month:'short',day:'numeric'})+
+      ' '+lastSavedTime.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  }
+} else {
+  live = RAW.map(r=>({...r,curStock:r.stock}));
+  markSaved();
+}
+
+document.getElementById('saveBtn').disabled=!hasUnsaved;
+render();
+
+// Warn before leaving with unsaved changes
+window.addEventListener('beforeunload',e=>{
+  if(hasUnsaved){ e.preventDefault(); e.returnValue=''; }
+});
+</script>
+</body>
+</html>
