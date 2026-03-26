@@ -1,2 +1,0 @@
-# Stock-Dashboard
-BATTER STOCK DASHBOARD
